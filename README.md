@@ -1,10 +1,8 @@
-# Welcome to scrape_reviews
+# 🏴‍☠️ Welcome to scrape_reviews ⚒️
 
 **The easiest way to get reviews in your hands.**
 
-scrape_reviews aspires to become a scraping package with a distinct module for each source of reviews.
-
-For now, available is only the scraping of *Google Maps*.
+scrape_reviews is a module for **scraping Google Maps reviews** that aspires to become a package with a distinct module for each source of reviews (Airbnb, Booking, etc.).
 
 The user can get reviews either by:
 - scanning a specific place (e.g. Nauru, Myrina, Aspen, Punta Cana) or 
@@ -15,38 +13,44 @@ The user can get reviews either by:
 ```bash
 pip install scrape_reviews
 ```
-## An example
 
-### Of Fetching 
+## Fetching 
 
 ```python
 from scrape_reviews import scraping_gmaps
 
 scan_a_place = scraping_gmaps.fetch_gmaps_reviews(
-    search = False,
+    place_wanted= "Nauru",
     category_wanted = "hoteles", 
     # Keyword of category In Spanish
     # It would also work with:
-    # "hotels", "hotéis", "ξενοδοχεία", "hôtels"   
-    place_wanted= "Nauru")
+    # "hotels", "hotéis", "ξενοδοχεία", "hôtels" 
+    #  
+    position_of_db_to_append_results = "my_reviews.db" 
+    # This will create a database in the current working directory
+    )
 
 make_a_search_query = scraping_gmaps.fetch_gmaps_reviews(
-    search = True,
-    category_wanted = "this_doesnt_matter_since_we_make_a_search_query", 
-    place_wanted= "Myrina Souvlaki") #Acts as a search term
+
+    place_wanted = "Myrina Souvlaki", # Acts as a search term,
+    
+    category_wanted = "doesnt_matter_since_we_want_to_make_a_search_query",
+    
+    position_of_db_to_append_results = "my_reviews.db" 
+    # Append the same database as before
+    )
 
 ```
 
-### And Exploring what's fetched
+### Exploring What's Fetched
 
 A dictionary containing two dictionaries: 
 
 ```python
-
 scan_a_place.keys()
 
 # Returns:
-dict_keys(['entity_info', 'reviews'])
+# dict_keys(['entity_info', 'reviews'])
 
 ```
 
@@ -56,13 +60,14 @@ Zooming into entity_info:
 
 scan_a_place['entity_info']
 
-# A dict containing lists:
+# A dict containing dictionaries with lists as values:
 # {
-# 'fetched_looking_at_place': ['Nauru', 'Nauru', 'Nauru', 'Nauru']
-# 'Name': ['Menen Hotel', 'Ewa Lodge', 'Od-N Aiwo Hotel', 'Airport Homestay']
-# 'Overall_Rating': ['3,8', '4,3', '3,6', '4,7']
-# 'fetched_at': ['02-09-2022_11.40.17', '02-09-2022_11.40.17', '02-09-2022_11.40.17', '02-09-2022_11.40.17']
-# 'Number_of_Ratings': ['(215)', '(97)', '(75)', '(12)']
+# {'Name': 
+# ['Menen Hotel', 'Ewa Lodge'], 
+# 'Number_of_Ratings': ['(217)', '(97)'], 
+# 'fetched_at': ['2022-09-09_16.52.54', '2022-09-09_16.52.54'], 
+# 'Overall_Rating': ['3,8', '4,3'], 
+# 'fetched_looking_at_place': ['Nauru', 'Nauru']
 # }
 
 ```
@@ -73,56 +78,40 @@ Then, zooming into reviews:
 scan_a_place['reviews'].keys()
 
 #dict_keys(
-# ['data-review-id', 'reviewers_no_of_reviews', 
-# 'regards_entity', 'fetched_at',
-#  'rating', 'text_of_review', 
-# 'date_created', 'reviewer']
+# ['data-review-id', 'date_created', 'reviewer',
+#  'regards_entity', 'reviewers_no_of_reviews',
+#  'fetched_at', 'text_of_review', 'rating']
 # )
 
 
+# Let's explore the make_a_search_query as well
+
 for reviews_key, reviews_dimension in make_a_search_query['reviews'].items():
     print("First Review's ", reviews_key, " starts with:", reviews_dimension[0][0][:15])
-    print("-"*30)
-    print("Second Review's ", reviews_key, " starts with:", reviews_dimension[0][1][:15])
-    print("-"*60)  
+    print("-"*30) 
 
 # Prints:
-# First Review's  reviewers_no_of_reviews  starts with: 5 κριτικές
-# ------------------------------
-# Second Review's  reviewers_no_of_reviews  starts with: 11 κριτικές
-# ------------------------------------------------------------
-# First Review's  reviewer  starts with: George Dristass
-# ------------------------------
-# Second Review's  reviewer  starts with: ΝΙΚΟΛΑΟΣ ΧΑΤΖΗΓ
-# ------------------------------------------------------------
-# First Review's  rating  starts with: 5/5
-# ------------------------------
-# Second Review's  rating  starts with: 1/5
-# ------------------------------------------------------------
-# First Review's  text_of_review  starts with: Πολύ ποιοτικός 
-# ------------------------------
-# Second Review's  text_of_review  starts with: 0/2 (Μηδέν στα 
-# ------------------------------------------------------------
-# First Review's  regards_entity  starts with: souvlaki.gr
-# ------------------------------
-# Second Review's  regards_entity  starts with: souvlaki.gr
-# ------------------------------------------------------------
+# 
 # First Review's  date_created  starts with: πριν από έναν μ
 # ------------------------------
-# Second Review's  date_created  starts with: πριν από 4 μήνε
-# ------------------------------------------------------------
-# First Review's  fetched_at  starts with: 05-09-2022_12.1
+# First Review's  fetched_at  starts with: 2022-09-09_17.3
 # ------------------------------
-# Second Review's  fetched_at  starts with: 05-09-2022_12.1
-# ------------------------------------------------------------
 # First Review's  data-review-id  starts with: ChdDSUhNMG9nS0V
 # ------------------------------
-# Second Review's  data-review-id  starts with: ChZDSUhNMG9nS0V
-# ------------------------------------------------------------
+# First Review's  reviewer  starts with: George Dristass
+# ------------------------------
+# First Review's  reviewers_no_of_reviews  starts with: 5 κριτικές
+# ------------------------------
+# First Review's  text_of_review  starts with: Πολύ ποιοτικός
+# ------------------------------
+# First Review's  regards_entity  starts with: souvlaki.gr
+# ------------------------------
+# First Review's  rating  starts with: 5/5
+# ------------------------------
+
 ```
 
-
-### Then Storing
+## Simply Storing Results as Pickles
 
 ```python
 from scrape_reviews.saving import serialize_results
@@ -135,7 +124,7 @@ where_are_my_fetched_reviews_stored =  serialize_results(
     )
 
 # Prints:
-# saved_at: C:\Users\kvoul\Myrina_Souvlaki_saved_at_2022-09-05_11.13.08_reviews.pkl
+# saved_at: C:\Users\kvoul\Myrina_Souvlaki_saved_at_2022-09-09_17.46.17_reviews.pkl
 
 # And returns the full path
 # So that we can assign it to a variable
@@ -143,11 +132,11 @@ where_are_my_fetched_reviews_stored =  serialize_results(
 print(where_are_my_fetched_reviews_stored)
 
 # Prints: 
-# C:\Users\kvoul\Myrina_Souvlaki_saved_at_2022-09-05_11.13.08_reviews.pkl
+# C:\Users\kvoul\Myrina_Souvlaki_saved_at_2022-09-09_17.46.17_reviews.pkl
 
 ```
 
-### And Re-Storing
+## Re-Store From Pickles
 
 ```python
 from scrape_reviews.saving import deserialize_results
@@ -161,6 +150,59 @@ print(restored_reviews_from_earlier_run.keys())
 
 ```
 
+## Or Read our Database 
+
+```python
+from scrape_reviews.connect_with_sqlite_db import DbConnector
+
+# Initiate a Connector
+my_medium = DbConnector(db_name = "my_reviews.db") # We filled with the above lines
+
+# Read a whole table
+my_medium.read_a_table(table_wanted = 'entity_info')
+
+# [
+# ('Menen Hotel', '3,8', '(217)', 'Nauru', '2022-09-09_16.52.54'),
+# ('Ewa Lodge', '4,3', '(97)', 'Nauru', '2022-09-09_16.52.54'),
+# ('Od-N Aiwo Hotel', '3,5', '(75)', 'Nauru', '2022-09-09_16.52.54'), 
+# ('souvlaki.gr', '4,3', '(186)', 'Myrina Souvlaki', '2022-09-09_17.08.09'), 
+# ('ΤΟ ΛΙΜΆΝΙ (ΨΗΤΟΠΩΛΕΙΟ,Γύρος)', '3,9', '(251)', 'Myrina Souvlaki', '2022-09-09_17.31.52'), 
+# ('Το Φαγουριό', '4,3', '(213)', 'Myrina Souvlaki', '2022-09-09_17.31.52')
+# ]
+
+my_medium.search_reviews(search_keyword = "from Brisbane")
+
+# Returns:
+# [
+# ('6 κριτικές', 
+# 'Alex Lindeman', 
+# '4/5', 
+# '(Μετάφραση από το Google) Προσβλέπουμε να ακούσουμε τη ζωντανή ψυχαγωγία του Reef Bar. Μια πράξη της κατηγορίας από το Μπρίσμπεϊν εκτελείται πλέον τακτικά.\n\n(Αρχικό κείμενο)\nLooking forward to hearing the Reef Bar s live entertainment.  A class act from Brisbane now performs regularly.', 
+# 'Menen Hotel', 
+# 'πριν από 8 χρόνια στο\nGoogle', 
+# '2022-09-09_16.52.54', 
+# 'ChdDSUhNMG9nS0VJQ0FnSUN3bmVDMHRBRRAB')
+# ]
+
+
+my_medium.perform_a_query(
+    query = """
+    SELECT reviewer, reviewers_no_of_reviews
+    FROM reviews
+    ORDER BY reviewer
+    LIMIT 3
+    """)
+
+# Returns:
+# [
+# ('A k', '8 κριτικές'), 
+# ('AF K', '1 κριτική'), 
+# ('AGGELIKI ANASTOPOULOU', 
+# 'Τοπικός οδηγός · 22 κριτικές')
+# ]
+
+```
+
 ### And Cleaning
 
 ```python
@@ -170,21 +212,20 @@ info_as_df = cleaning_gmaps.from_info_dict_to_info_df(restored_reviews_from_earl
 
 print(info_as_df.head(1))
 
-#           Name Overall_Rating  ... Number_of_Ratings fetched_looking_at_place
-# 0  souvlaki.gr            4,4  ...             (186)          Myrina Souvlaki
+#   Overall_Rating           fetched_at fetched_looking_at_place         Name Number_of_Ratings
+# 0            4,3  2022-09-09_17.31.52          Myrina Souvlaki  souvlaki.gr             (186)
 
 # [1 rows x 5 columns]
-
 
 clean_info_df = cleaning_gmaps.clean_info_df(info_as_df)
 
 print(clean_info_df.dtypes)
 
-# Name                         object
 # Overall_Rating              float64
 # fetched_at                   object
-# Number_of_Ratings             int32
 # fetched_looking_at_place     object
+# Name                         object
+# Number_of_Ratings             int32
 # dtype: object
 
 ```
@@ -197,31 +238,38 @@ from scrape_reviews import cleaning_gmaps
 reviews_as_df = cleaning_gmaps.from_reviews_dict_to_reviews_df(restored_reviews_from_earlier_run)
 
 print(reviews_as_df.head(1))
-
-#                          data-review-id  ...          reviewer
-# 0  ChdDSUhNMG9nS0VJQ0FnSUN1LUo3ci13RRAB  ...  George Dristasss
+#          date_created           fetched_at  ... regards_entity rating
+# 0  πριν από έναν μήνα  2022-09-09_17.31.52  ...    souvlaki.gr    5/5
 
 # [1 rows x 8 columns]
+
+
+clean_reviews_df = cleaning_gmaps.clean_reviews_df(reviews_as_df)
+print(clean_reviews_df.head(1))
+
+#          date_created           fetched_at  ... Created_Before_measure_unit_of_time Review_Listed_at
+# 0  πριν από έναν μήνα  2022-09-09_17.31.52  ...                                μήνα
+
+# [1 rows x 15 columns]
 
 print(clean_reviews_df.dtypes)
 
 # Prints:
-# reviewers_no_of_reviews                 object
-# reviewer                                object
-# rating                                  object
-# text_of_review                          object
-# regards_entity                          object
 # date_created                            object
 # fetched_at                              object
 # data-review-id                          object
+# reviewer                                object
+# reviewers_no_of_reviews                 object
+# text_of_review                          object
+# regards_entity                          object
+# rating                                  object
 # absolute_rating                        float64
 # rating_out_of                          float64
 # rating_raw                              object
 # relative_rating                        float64
-# Created_Before                          object
-# Review_Listed_at                        object
 # Created_Before_number                   object
 # Created_Before_measure_unit_of_time     object
+# Review_Listed_at                        object
 # dtype: object
 
 ```

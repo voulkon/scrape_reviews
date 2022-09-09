@@ -1,21 +1,28 @@
+from scrape_reviews.connect_with_sqlite_db import DbConnector
 
 from scrape_reviews.gmaps_constants import (FOUND_IN_ATTRIBUTES, FOUND_IN_CLASSES, INFO_DICTIONARY,GENERAL_WAIT_TIME,
                                    CLASS_OF_REVIEW_CONTAINER, CLASS_OF_REVIEWS_BUTTON, REVIEWS_WINDOWS_CLASS,
                                     CLASS_OF_STARS, COOKIES_XPATH, PARENT_XPATH_OF_CATEGORIES,
                                     XPATH_OF_EACH_CATEGORY, #FIRST_ENTITY_IS_AT_THIS_POSITION_OF_ELEMENTS_OF_LEFT_PANEL,
-                                    CLASS_OF_CATEGORIES_OF_INTEREST_BUTTONS
+                                    CLASS_OF_CATEGORIES_OF_INTEREST_BUTTONS, ENTITIES_BASE_XPATH_INIT
                                     )
 
 from scrape_reviews.categories_of_interest import GoogleMapsCategories
-
-from scrape_reviews.connect_with_sqlite_db import DbConnector
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from time import sleep
 import logging
+import inspect
 
+import datetime
+import pytz
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+import logging
+
+from scrape_reviews.categories_of_interest import GoogleMapsCategories
 
 def prettify_log_msg(msg):
         """
@@ -198,7 +205,7 @@ def scroll_down_to_reveal_all_reviews(
         
         sleep(sleep_time_between_scrolls)
 
-def extract_info_of_each_element(specific_element, INFO_DICTIONARY:str = INFO_DICTIONARY) -> dict[str]:
+def extract_info_of_each_element(specific_element, INFO_DICTIONARY:dict[str] = INFO_DICTIONARY) -> dict[str]:
     """
     Returns name, rating and number of reviews for an entity
     
@@ -317,68 +324,6 @@ def procrastinate_until_available(search_by, search_what, driver,no_of_attempts 
             logging.debug(  f" Attempt {str(r+1)} was unsuccessful. Heading for the attempt no. {str(r+2)}" )
             pass
 
-def clean_one_entitys_reviews(
-    no_of_reviews:int, 
-    regards_entity:str, 
-    driver,  
-    fetched_at:str, 
-    search_what = REVIEWS_WINDOWS_CLASS, 
-    search_by = By.CSS_SELECTOR, 
-    CLASS_OF_REVIEWS_BUTTON = CLASS_OF_REVIEWS_BUTTON, 
-    REVIEWS_WINDOWS_CLASS = REVIEWS_WINDOWS_CLASS,
-    this_sessions_connector = None
-    ) -> dict[list[str]]:
-    """
-    Returns all reviews for an entity.
-    """
-    # import pandas as pd
-    # import logging
-
-    #reviews_window = driver.find_element(search_by,search_what)
-    
-    scroll_down_to_reveal_all_reviews(no_of_reviews = no_of_reviews,  driver = driver,  sleep_time_between_scrolls = GENERAL_WAIT_TIME  )
-
-    expand_collapsed_reviews(driver = driver)
-
-    reviews_of_this_entity = driver.find_elements(By.CLASS_NAME,  CLASS_OF_REVIEW_CONTAINER )
-    
-    logging.debug( prettify_log_msg(f'Number of children nodes after the scrolling: {len(reviews_of_this_entity)}. Total Expected Reviews: {no_of_reviews} ') )
-    
-    if this_sessions_connector:
-        
-        for rev in reviews_of_this_entity:
-            
-            this_sessions_connector.insert_values_in_table(
-                table_waned = "reviews", 
-                items = clean_one_review(rev)
-                )
-            
-    else:
-        
-        this_entitys_reviews_clean = [clean_one_review(rev) for rev in reviews_of_this_entity]
-    
-    
-        def merge_dictionary_list(dict_list):
-            # From Alex Hall: https://stackoverflow.com/users/2482744/alex-hall 
-            return {
-                k: [d.get(k) for d in dict_list if k in d] # explanation A
-                for k in set().union(*dict_list) # explanation B
-                    }
-    
-        this_entitys_reviews_clean = merge_dictionary_list(this_entitys_reviews_clean)
-        
-        logging.debug( prettify_log_msg(f'Number of cleaned reviews (as dictionaries): {len(this_entitys_reviews_clean)}. Total Expected Reviews: {no_of_reviews} ') )
-        
-        no_of_reviews_cleaned = len(this_entitys_reviews_clean["data-review-id"])
-    
-        this_entitys_reviews_clean["regards_entity"] = [regards_entity] * no_of_reviews_cleaned
-    
-        this_entitys_reviews_clean["fetched_at"] =  [fetched_at] * no_of_reviews_cleaned
-        
-        logging.info( prettify_log_msg(f'Number of reviews cleaned: {no_of_reviews_cleaned}. Total Expected Reviews: {no_of_reviews} ') )
-        
-        return this_entitys_reviews_clean
-
 @calculate_elapsed_time
 def surpass_cookies(driver, COOKIES_XPATH = COOKIES_XPATH):
     
@@ -413,7 +358,6 @@ def category_in_proper_language(categories_of_interest_buttons, GoogleMapsCatego
     for key in existing_keys:
         
         for category_in_a_specific_lang in GoogleMapsCategory:
-            
             if key.lower() == category_in_a_specific_lang:
                 
                 return key
@@ -451,173 +395,13 @@ def prepare_left_pane(driver, entities_base_xpath_init, sleep_time_between_scrol
         sleep_time_between_scrolls = sleep_time_between_scrolls_
     )
 
-def fetch_reviews(
-    driver,
-    entities_base_xpath:str, 
-    fetched_at:str, 
-    fetched_looking_at_place:str,
-    this_sessions_connector = None
-    ):
-    """
-    This function starts when we've loaded all available entities (hotels, restaurants, etc.)
-    """
-    
-    def merge_dictionary_list(dict_list):
-        # From Alex Hall: https://stackoverflow.com/users/2482744/alex-hall 
-        return {
-            k: [d.get(k) for d in dict_list if k in d] # explanation A
-            for k in set().union(*dict_list) # explanation B
-                }
-
-    def find_where_first_entity_is(driver, entities_base_xpath = entities_base_xpath ):
-
-        for try_position in range(10):
-            temp_position = entities_base_xpath.format( entity_position = try_position )
-            try:
-                extracted = extract_info_of_each_element( driver.find_element(By.XPATH, temp_position ))
-                if isinstance(extracted,dict):
-                    if extracted["Name"] != "":
-                        return try_position
-            except:
-                continue
-
-        return None
-    
-    this_entitys_number = find_where_first_entity_is(driver = driver, entities_base_xpath = entities_base_xpath )
-    
-    all_info = []
-    all_reviews = []
-
-    time_to_break = False
-
-    try:
-            
-        while not time_to_break:
-
-            next_entitys_xpath = entities_base_xpath.format( entity_position = this_entitys_number )
-            
-            try:
-
-                #Header - info regarding the whole entity and referring to many reviews
-                procrastinate_until_available(By.XPATH, next_entitys_xpath, driver = driver)
-                specific_element = driver.find_element(By.XPATH, next_entitys_xpath)
-                specific_elements_info =  extract_info_of_each_element(specific_element)
-                
-                specific_elements_info['fetched_at'] = fetched_at
-                specific_elements_info['fetched_looking_at_place'] = fetched_looking_at_place
-                this_entitys_name = specific_elements_info['Name']
-                this_entitys_number +=2
-                
-                this_entitys_name_already_exists = any([this_entitys_name in ent['Name'] for ent in all_info])
-
-                logging.info(  prettify_log_msg("Now Scraping reviews for : " + this_entitys_name)  )
-                
-                if this_sessions_connector:
-                    
-                    #Make it a tuple
-                    values_for_db = (val for val in specific_elements_info.values())
-                    
-                    #Append or ignore
-                    this_sessions_connector.insert_values_in_table(table_wanted = 'entity_info',  items = values_for_db )
-
-            except:
-                #In case specific_elements_info didn't go as expected
-                print("No More Entities to Scrape")
-                break
-
-            if specific_elements_info['Number_of_Ratings'] == 'N/A':
-                
-                logging.info(prettify_log_msg(f'{this_entitys_name} has no reviews. Moving On to the next. '))
-                
-                continue
-
-
-            if this_entitys_name_already_exists:
-
-                logging.info( prettify_log_msg( f'We\'ve already scraped {this_entitys_name}. Moving On to the next.' ))
-                
-                continue
-            
-            
-            ### Click on the Entity ###
-            logging.debug( prettify_log_msg( f'Preparing to click on reviews of {this_entitys_name}.' ))
-            procrastinate_until_available(By.XPATH, next_entitys_xpath, driver = driver)
-            try:
-                WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, next_entitys_xpath))).click()
-                logging.debug( f' Clicked on {this_entitys_name} on first attempt.' )
-            except:
-                sleep(1)
-                logging.debug(f'Didn\'t manage to click on {this_entitys_name} on first attempt. Trying again to click on entity.')
-                try:
-                    WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, next_entitys_xpath))).click()
-                    logging.debug( f' Clicked on {this_entitys_name} on second attempt.' )
-                except:
-                    WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, next_entitys_xpath))).click()
-                    logging.debug( f' Clicked on {this_entitys_name} on third attempt.' )
-   
-            procrastinate_until_available(By.CLASS_NAME, CLASS_OF_REVIEWS_BUTTON, driver = driver)
-            #reviews_element = driver.find_element(By.CLASS_NAME, CLASS_OF_REVIEWS_BUTTON)
-              
-            #logging.info("Before finding the reviews_window")   
-            procrastinate_until_available(By.CSS_SELECTOR, REVIEWS_WINDOWS_CLASS, driver = driver)
-            #reviews_window = driver.find_element(By.CSS_SELECTOR, REVIEWS_WINDOWS_CLASS)
-            
-            try:
-                WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, CLASS_OF_REVIEWS_BUTTON))).click()
-                logging.info( f' Clicked on reviews of {this_entitys_name} on first attempt.' )
-                
-            except:
-
-                logging.info(f'Didn\'t manage to click on reviews of {this_entitys_name} on first attempt. Trying again to click on entity.')
-                
-                WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, CLASS_OF_REVIEWS_BUTTON))).click()
-                
-                logging.info( f' Clicked on reviews of {this_entitys_name} on first attempt.' )
-
-            logging.debug(f'sleeping for {GENERAL_WAIT_TIME}')
-
-            sleep(GENERAL_WAIT_TIME)
-            
-            no_of_reviews = int(specific_elements_info['Number_of_Ratings'].replace("(","").replace(")",""))
-
-            logging.info( f'Entering this_entitys_reviews. Expecting to extract {no_of_reviews} reviews'  )
-            
-            this_entitys_reviews = clean_one_entitys_reviews(no_of_reviews = no_of_reviews, 
-                                                             driver = driver, 
-                                                             regards_entity = this_entitys_name,
-                                                             fetched_at = fetched_at,
-                                                             this_sessions_connector = this_sessions_connector
-                                                             )
-            
-            if not specific_elements_info: # equals if it's extract_info_of_each_element has returned None     
-                
-                logging.debug("in the specific_elements_info is null")
-                break
-
-            else:
-                  
-                #logging.info(prettify_log_msg(f'Scraped: {this_entitys_name} . Cleaned {this_entitys_reviews.shape[0]} reviews'))
-                
-                all_info.append(specific_elements_info)
-                all_reviews.append(this_entitys_reviews)
-
-    except KeyboardInterrupt:
-    
-        logging.info('KeyboardInterrupt exception is caught. So far cleaned ' , len(all_info) , ' Overall info.')
-    
-        return { "entity_info": merge_dictionary_list(all_info),"reviews" : merge_dictionary_list(all_reviews) }
-        
-    finally:
-
-        return { "entity_info": merge_dictionary_list(all_info),"reviews" : merge_dictionary_list(all_reviews) }
-
 def fetch_gmaps_reviews(
-    category_wanted:str, 
-    place_wanted:str, 
-    search:bool = False,
+    place_wanted:str,
+    category_wanted:str,  
     local_chromedriver_position:str = None,
-    entities_base_xpath_init:str = '//*[@id="QA0Szd"]/div/div/div[1]/div[2]/div/div[1]/div/div/div[{to_be_confirmed}]/div[1]',
-    position_of_db_to_append_results:str = None
+    entities_base_xpath_init:str = ENTITIES_BASE_XPATH_INIT,
+    position_of_db_to_append_results:str = None,
+    return_something:bool = True
     ) -> list:
 
     """
@@ -629,6 +413,15 @@ def fetch_gmaps_reviews(
     
     Parameters
     ----------
+
+
+    place_wanted:str
+        Either:
+            - Some text to search in Google Maps - e.g. Punta Cana Cocktails, Myrina Souvlaki
+
+            - A [city / village/ island / place] name, like Myrina, Punta Cana, Aspen, etc. OR
+                This needs to be followed by a valid category_wanted (see below) for more
+
     category_wanted : str
 
         A keyword signifying which category of interest (hotels, restaurants, museums, etc) 
@@ -649,54 +442,279 @@ def fetch_gmaps_reviews(
         in greek the word "ξενοδοχεία",
         in spanish the word "hoteles"
 
-    place_wanted:str
-        A [city / village/ island / place in general] name.
-
-    search:bool
-        whether we want to search Google Maps instead of 
-        generally looking for a place
-
-        For example, 
-        If we pass:
-
-            place_wanted = "Souvlaki in Myrina"
-        
-        That's a keyword aiming conduct a search in Google Maps
-        and it's the same as typing plain "Myrina" 
-
     local_chromedriver_position:str
+
         A path, in case the chromedriver executable is already downloaded.
 
         If not provided, the ChromeDriverManager().install() will handle it.
     
     entities_base_xpath_init:str
+
         The xpath of the column (in the left part of the window) that contains the reviews
     
-    #TODO: Document this db position
     position_of_db_to_append_results:str
-    
+        
+        A path/location where we want an sqlite database to receive the results of scraping.
+        
+        It could either be an absolute or a relative path.
+
+        It it's not already existing, it will get created.
+
+        If it's None (the default), the sqlite database will not get involved at all.
+
+    return_something:bool
+ 
+        Useful in case we only want to fill our database and want to avoid occupying RAM space.
+        Controls whether the function call will return a dictionary full or empty with reviews.
+
+        For example, if we have 10 restaurants and each of it has 100 reviews, 
+        our RAM will need to store 10,000 reviews until the function finishes.
+
+        If we only want to append the Database, we will only be storing the current review under process. 
+
+
     Returns:
     -------
     A list containing two pd.DataFrames:
         One with info regarding the whole entity (be it hotel or restaurant)
-        One with reviews
+        One with reviews (if return_something = False, this will be empty)
 
     """
-    
-    #import time
-    import datetime
-    import pytz
-    from selenium import webdriver
-    from webdriver_manager.chrome import ChromeDriverManager
-    import logging
 
-    from scrape_reviews.categories_of_interest import GoogleMapsCategories
+
+    def fetch_reviews(
+        driver,
+        entities_base_xpath:str, 
+        fetched_at:str, 
+        fetched_looking_at_place:str,
+        this_sessions_connector = None,
+        return_something:bool = True
+        ):
+        """
+        This function starts when we've loaded all available entities (hotels, restaurants, etc.)
+        """
+            
+        def clean_one_entitys_reviews(
+            no_of_reviews:int, 
+            regards_entity:str, 
+            driver,  
+            fetched_at:str, 
+            search_what = REVIEWS_WINDOWS_CLASS, 
+            search_by = By.CSS_SELECTOR, 
+            CLASS_OF_REVIEWS_BUTTON = CLASS_OF_REVIEWS_BUTTON, 
+            REVIEWS_WINDOWS_CLASS = REVIEWS_WINDOWS_CLASS,
+            this_sessions_connector = None,
+            return_something:bool = True
+            ) -> dict[list[str]]:
+
+            """
+            Returns all reviews for an entity.
+            """
+
+            def merge_dictionary_list(dict_list):
+                    # From Alex Hall: https://stackoverflow.com/users/2482744/alex-hall 
+                return {
+                    k: [d.get(k) for d in dict_list if k in d] # explanation A
+                    for k in set().union(*dict_list) # explanation B
+                    }
+            
+            scroll_down_to_reveal_all_reviews(no_of_reviews = no_of_reviews,  driver = driver,  sleep_time_between_scrolls = GENERAL_WAIT_TIME  )
+
+            expand_collapsed_reviews(driver = driver)
+
+            reviews_of_this_entity = driver.find_elements(By.CLASS_NAME,  CLASS_OF_REVIEW_CONTAINER )
+            
+            logging.debug( prettify_log_msg(f'Number of children nodes after the scrolling: {len(reviews_of_this_entity)}. Total Expected Reviews: {no_of_reviews} ') )
+            
+            this_entitys_reviews_clean = []
+
+            for rev in reviews_of_this_entity:
+                
+                clean_review = clean_one_review(rev)
+                    
+                clean_review["regards_entity"] = regards_entity 
+
+                clean_review["fetched_at"] =  fetched_at
+
+                if this_sessions_connector:
+
+                        this_sessions_connector.insert_values_in_table_by_colname(
+                            table_wanted = "reviews", 
+                            named_items =  clean_review
+                            )
+                        logging.debug(f'Appended {clean_review["data-review-id"]} to the db')
+
+                if return_something:
+                    
+                    this_entitys_reviews_clean.append(clean_review)  #[clean_one_review(rev) for rev in reviews_of_this_entity]
+            
+            #Outside the for each review loop
+            if return_something:
+
+                this_entitys_reviews_clean = merge_dictionary_list(this_entitys_reviews_clean)
+                    
+                logging.debug( prettify_log_msg(f'Number of cleaned reviews (as dictionaries): {len(this_entitys_reviews_clean)}. Total Expected Reviews: {no_of_reviews} ') )
+                    
+                no_of_reviews_cleaned = len(this_entitys_reviews_clean["data-review-id"])
+                
+                logging.info( prettify_log_msg(f'Number of reviews cleaned: {no_of_reviews_cleaned}. Total Expected Reviews: {no_of_reviews} ') )
+                
+                logging.info(f'Right before the Return. This_entitys_reviews_clean: {this_entitys_reviews_clean}')
+
+            return this_entitys_reviews_clean
+
+        def merge_dictionary_list(dict_list):
+            # From Alex Hall: https://stackoverflow.com/users/2482744/alex-hall 
+            return {
+                k: [d.get(k) for d in dict_list if k in d] # explanation A
+                for k in set().union(*dict_list) # explanation B
+                    }
+
+        def find_where_first_entity_is(driver, entities_base_xpath = entities_base_xpath ):
+
+            for try_position in range(10):
+                temp_position = entities_base_xpath.format( entity_position = try_position )
+                try:
+                    extracted = extract_info_of_each_element( driver.find_element(By.XPATH, temp_position ))
+                    if isinstance(extracted,dict):
+                        if extracted["Name"] != "":
+                            return try_position
+                except:
+                    continue
+
+            return None
+        
+        this_entitys_number = find_where_first_entity_is(driver = driver, entities_base_xpath = entities_base_xpath )
+        
+        all_info = []
+        all_reviews = []
+
+        time_to_break = False
+
+        try:
+                
+            while not time_to_break:
+
+                next_entitys_xpath = entities_base_xpath.format( entity_position = this_entitys_number )
+                
+                try:
+
+                    #Header - info regarding the whole entity and referring to many reviews
+                    procrastinate_until_available(By.XPATH, next_entitys_xpath, driver = driver)
+                    specific_element = driver.find_element(By.XPATH, next_entitys_xpath)
+                    specific_elements_info =  extract_info_of_each_element(specific_element)
+                    
+                    specific_elements_info['fetched_at'] = fetched_at
+                    specific_elements_info['fetched_looking_at_place'] = fetched_looking_at_place
+                    this_entitys_name = specific_elements_info['Name']
+                    this_entitys_number +=2
+                    
+                    this_entitys_name_already_exists = any([this_entitys_name in ent['Name'] for ent in all_info])
+
+                    logging.info(  prettify_log_msg("Now Scraping reviews for : " + this_entitys_name)  )
+                    
+                    if this_sessions_connector:
+                        #Append or ignore
+                        this_sessions_connector.insert_values_in_table_by_colname(
+                            table_wanted = 'entity_info', 
+                            named_items =  specific_elements_info)
+                        
+                except:
+                    #In case specific_elements_info didn't go as expected
+                    print("No More Entities to Scrape")
+                    break
+
+                if specific_elements_info['Number_of_Ratings'] == 'N/A':
+                    
+                    logging.info(prettify_log_msg(f'{this_entitys_name} has no reviews. Moving On to the next. '))
+                    
+                    continue
+
+                if this_entitys_name_already_exists:
+
+                    logging.info( prettify_log_msg( f'We\'ve already scraped {this_entitys_name}. Moving On to the next.' ))
+                    
+                    continue
+                
+                ### Click on the Entity ###
+                logging.debug( prettify_log_msg( f'Preparing to click on reviews of {this_entitys_name}.' ))
+                procrastinate_until_available(By.XPATH, next_entitys_xpath, driver = driver)
+                try:
+                    WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, next_entitys_xpath))).click()
+                    logging.debug( f' Clicked on {this_entitys_name} on first attempt.' )
+                except:
+                    sleep(1)
+                    logging.debug(f'Didn\'t manage to click on {this_entitys_name} on first attempt. Trying again to click on entity.')
+                    try:
+                        WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, next_entitys_xpath))).click()
+                        logging.debug( f' Clicked on {this_entitys_name} on second attempt.' )
+                    except:
+                        WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, next_entitys_xpath))).click()
+                        logging.debug( f' Clicked on {this_entitys_name} on third attempt.' )
+    
+                procrastinate_until_available(By.CLASS_NAME, CLASS_OF_REVIEWS_BUTTON, driver = driver)
+                #reviews_element = driver.find_element(By.CLASS_NAME, CLASS_OF_REVIEWS_BUTTON)
+                
+                #logging.info("Before finding the reviews_window")   
+                procrastinate_until_available(By.CSS_SELECTOR, REVIEWS_WINDOWS_CLASS, driver = driver)
+                #reviews_window = driver.find_element(By.CSS_SELECTOR, REVIEWS_WINDOWS_CLASS)
+                
+                try:
+                    WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, CLASS_OF_REVIEWS_BUTTON))).click()
+                    logging.info( f' Clicked on reviews of {this_entitys_name} on first attempt.' )
+                    
+                except:
+
+                    logging.info(f'Didn\'t manage to click on reviews of {this_entitys_name} on first attempt. Trying again to click on entity.')
+                    
+                    WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, CLASS_OF_REVIEWS_BUTTON))).click()
+                    
+                    logging.info( f' Clicked on reviews of {this_entitys_name} on first attempt.' )
+
+                logging.debug(f'sleeping for {GENERAL_WAIT_TIME}')
+
+                sleep(GENERAL_WAIT_TIME)
+                
+                no_of_reviews = int(specific_elements_info['Number_of_Ratings'].replace("(","").replace(")",""))
+
+                logging.info( f'Entering this_entitys_reviews. Expecting to extract {no_of_reviews} reviews'  )
+                
+                this_entitys_reviews = clean_one_entitys_reviews(no_of_reviews = no_of_reviews, 
+                                                                driver = driver, 
+                                                                regards_entity = this_entitys_name,
+                                                                fetched_at = fetched_at,
+                                                                this_sessions_connector = this_sessions_connector,
+                                                                return_something = return_something
+                                                                )
+                
+                if not specific_elements_info: # equals if it's extract_info_of_each_element has returned None     
+                    
+                    logging.debug("in the specific_elements_info is null")
+                    break
+
+                else:
+                    
+                    #logging.info(prettify_log_msg(f'Scraped: {this_entitys_name} . Cleaned {this_entitys_reviews.shape[0]} reviews'))
+                    
+                    all_info.append(specific_elements_info)
+                    all_reviews.append(this_entitys_reviews)
+
+        except KeyboardInterrupt:
+        
+            logging.info('KeyboardInterrupt exception is caught. So far cleaned ' , len(all_info) , ' Overall info.')
+        
+            return { "entity_info": merge_dictionary_list(all_info),"reviews" : merge_dictionary_list(all_reviews) }
+            
+        finally:
+
+            return { "entity_info": merge_dictionary_list(all_info),"reviews" : merge_dictionary_list(all_reviews) }
     
     will_work_with_db = position_of_db_to_append_results is not None
     
     #Initiate or set as None
     this_sessions_connector = DbConnector(db_name = position_of_db_to_append_results) if will_work_with_db else None
     
+    ### Try to Transform the given keyword to a valid category #### 
     def from_one_languages_text_to_a_list_of_all(category_wanted:str,attributes:list[tuple]) -> list[str]:
 
         """
@@ -738,29 +756,23 @@ def fetch_gmaps_reviews(
         #If nothing's found     
         return None
 
-    #if isinstance(category_wanted,str):
-        
-        import inspect
+    attributes = inspect.getmembers(GoogleMapsCategories, lambda a:not(inspect.isroutine(a)))    
 
-        attributes = inspect.getmembers(GoogleMapsCategories, lambda a:not(inspect.isroutine(a)))
-        
-        category_wanted = from_one_languages_text_to_a_list_of_all(category_wanted,attributes )
+    category_wanted = from_one_languages_text_to_a_list_of_all(category_wanted,attributes )
   
-        #logging.info(f"category_wanted {(category_wanted[0])}")
-
+    # If the keyword given to the category is not matched in our 
+    # Predifined Categories
+    # We'll perform a search with the place_wanted
+    search = not isinstance(category_wanted,list)
+    
     #Keep a timestamp to know when each dataset was extracted
-    fetched_at = datetime.datetime.now(pytz.timezone('Europe/Athens')).strftime("%d-%m-%Y_%H.%M.%S")
+    fetched_at = datetime.datetime.now(pytz.timezone('Europe/Athens')).strftime("%Y-%m-%d_%H.%M.%S")
     logging.debug(f"Fetched at: {fetched_at}")
 
     # We initiate the driver, this will be our vehicle throughout the scraping session
     # A chrome browser will open and 
     # several actions (like scrolling and waiting for the page to refresh) will take place through it 
-    use_local_chromedriver = local_chromedriver_position is not None
-    if use_local_chromedriver:
-        driver = webdriver.Chrome(local_chromedriver_position)
-    else:
-        driver = webdriver.Chrome(ChromeDriverManager().install())
-
+    driver = webdriver.Chrome(local_chromedriver_position) if local_chromedriver_position else webdriver.Chrome(ChromeDriverManager().install())
 
     search_or_place_part = 'search' if search else 'place'
     url_wanted = f'https://www.google.com/maps/{search_or_place_part}/{place_wanted}'
@@ -812,9 +824,11 @@ def fetch_gmaps_reviews(
 
     this_towns_reviews = fetch_reviews(
         fetched_looking_at_place = place_wanted, 
-        driver = driver, fetched_at=fetched_at , 
+        driver = driver, 
+        fetched_at=fetched_at , 
         entities_base_xpath = entities_base_xpath,
-        this_sessions_connector = this_sessions_connector
+        this_sessions_connector = this_sessions_connector,
+        return_something = return_something
         )
 
     return this_towns_reviews

@@ -3,11 +3,12 @@ import pandas as pd
 import logging
 
 class DbConnector:
-
+    
     def __init__(self,db_name):
+        
         self.db_name = db_name #Store as a property in case it's needed
         self.connection = sqlite3.connect(self.db_name )
-        logging.info("Connected to:", self.db_name )
+        logging.info(f"Connected to: {self.db_name}" )
         self.cur = self.connection.cursor()
         self.attempt_to_create_tables()
 
@@ -18,9 +19,9 @@ class DbConnector:
         CREATE TABLE IF NOT EXISTS entity_info (
             Name TEXT NOT NULL PRIMARY KEY,
             Overall_Rating TEXT(3),
+            Number_of_Ratings TEXT(10),
             'fetched_looking_at_place' TEXT(50),
-            fetched_at TEXT(19),
-            Number_of_Ratings TEXT(3)
+            fetched_at TEXT(19)
             );
             """
             )
@@ -90,5 +91,34 @@ class DbConnector:
         
         self.cur.execute(insert_values_query_formatted,items)
         
-        self.con.commit()        
+        self.connection.commit() 
+    
+    def insert_values_in_table_by_colname(
+        self,
+        table_wanted:str,
+        named_items:dict        
+     ):
+
+        columns_part =  ",".join(["'"+ k + "'" for k in named_items.keys()])
+
+        values_part = ",".join([ "'" + v.replace("'", " " ) + "'" for v in named_items.values()])
         
+        insert_named_values_query = """
+        INSERT OR
+        IGNORE INTO
+        {table_wanted} ({columns_part})
+        VALUES ({values_part})
+        """
+        
+        insert_named_values_query_formatted = insert_named_values_query.format(
+            table_wanted = table_wanted,
+            values_part = values_part,
+            columns_part = columns_part 
+            )
+        
+        self.cur.execute(insert_named_values_query_formatted)
+        
+        self.connection.commit() 
+
+    def perform_a_query(self,query):
+        return self.cur.execute(query).fetchall()

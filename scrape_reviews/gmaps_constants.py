@@ -36,6 +36,8 @@ CLASS_OF_REVIEWS_BUTTON = "DkEaL" #"hh2c6.G7m0Af" #""
 REVIEWS_WINDOWS_CLASS = "#QA0Szd > div > div > div.w6VYqd > div.bJzME.Hu9e2e.tTVLSc > div > div.e07Vkf.kA9KIf > div > div > div.m6QErb.DxyBCb.kA9KIf.dS8AEf"
 CLASS_OF_CATEGORIES_OF_INTEREST_BUTTONS = "KNfEk.Rqu0ae"
 
+ENTITIES_BASE_XPATH_INIT = '//*[@id="QA0Szd"]/div/div/div[1]/div[2]/div/div[1]/div/div/div[{to_be_confirmed}]/div[1]'
+
 CLASS_OF_STARS = 'kvMYJc'
 
 #The Button to Click in order to Avoid Cookies Screen and procceed with the actul website

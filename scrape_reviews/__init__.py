@@ -27,8 +27,3 @@ if _missing_dependencies:
         "Unable to import required dependencies:\n" + "\n".join(_missing_dependencies)
     )
 del _hard_dependencies, _dependency, _missing_dependencies
-
-#from gmaps.categories_of_interest import GoogleMapsCategories
-# import logging, sys
-# #logging.basicConfig(stream=sys.stderr, level=logging.INFO)
-# from gmaps.scraping import *
