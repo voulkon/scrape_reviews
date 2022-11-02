@@ -5,8 +5,10 @@ Summary: Scrape Online Reviews
 Home-page: https://github.com/voulkon/scrape_reviews
 Author: Konstantinos Voulgaropoulos
 Author-email: voulkon93@gmail.com
+License: UNKNOWN
 Project-URL: Source Code, https://github.com/voulkon/scrape_reviews
 Keywords: scrape,reviews,maps,google,gmaps,hotels,restaurants,hotel_reviews,restaurant_reviews
+Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
@@ -289,3 +291,5 @@ print(clean_reviews_df.dtypes)
 # dtype: object
 
 ```
+
+

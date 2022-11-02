@@ -487,7 +487,8 @@ def fetch_gmaps_reviews(
         fetched_at:str, 
         fetched_looking_at_place:str,
         this_sessions_connector = None,
-        return_something:bool = True
+        return_something:bool = True,
+        entities_from_previous_runs = None
         ):
         """
         This function starts when we've loaded all available entities (hotels, restaurants, etc.)
@@ -611,11 +612,21 @@ def fetch_gmaps_reviews(
                     specific_elements_info['fetched_looking_at_place'] = fetched_looking_at_place
                     this_entitys_name = specific_elements_info['Name']
                     this_entitys_number +=2
-                    
-                    this_entitys_name_already_exists = any([this_entitys_name in ent['Name'] for ent in all_info])
 
                     logging.info(  prettify_log_msg("Now Scraping reviews for : " + this_entitys_name)  )
                     
+                    this_entitys_name_already_exists = any([this_entitys_name in ent['Name'] for ent in all_info])
+
+                    logging.info(  prettify_log_msg(f"this_entitys_name_already_exists : {this_entitys_name_already_exists}")  )
+
+                    if entities_from_previous_runs:
+
+                        this_entitys_name_already_exists_from_previous_runs = this_entitys_name in entities_from_previous_runs
+
+                        logging.info(  prettify_log_msg(f"this_entitys_name_already_exists_from_previous_runs : {this_entitys_name_already_exists_from_previous_runs}")  )
+
+                        
+
                     if this_sessions_connector:
                         #Append or ignore
                         this_sessions_connector.insert_values_in_table_by_colname(
@@ -638,6 +649,13 @@ def fetch_gmaps_reviews(
                     logging.info( prettify_log_msg( f'We\'ve already scraped {this_entitys_name}. Moving On to the next.' ))
                     
                     continue
+
+                if this_entitys_name_already_exists_from_previous_runs:
+                    
+                    logging.info( prettify_log_msg( f'We\'ve already scraped {this_entitys_name} from previous run. Moving On to the next.' ))
+                    
+                    continue
+
                 
                 ### Click on the Entity ###
                 logging.debug( prettify_log_msg( f'Preparing to click on reviews of {this_entitys_name}.' ))
@@ -717,6 +735,16 @@ def fetch_gmaps_reviews(
     #Initiate or set as None
     this_sessions_connector = DbConnector(db_name = position_of_db_to_append_results) if will_work_with_db else None
     
+    if will_work_with_db:
+        
+        entities_from_previous_runs_raw = this_sessions_connector.perform_a_query("""SELECT distinct Name FROM entity_info""")
+
+        entities_from_previous_runs = [ent[0] for ent in entities_from_previous_runs_raw]
+    
+    else:
+
+        entities_from_previous_runs = None
+
     ### Try to Transform the given keyword to a valid category #### 
     def from_one_languages_text_to_a_list_of_all(category_wanted:str,attributes:list[tuple]) -> list[str]:
 
@@ -831,7 +859,8 @@ def fetch_gmaps_reviews(
         fetched_at=fetched_at , 
         entities_base_xpath = entities_base_xpath,
         this_sessions_connector = this_sessions_connector,
-        return_something = return_something
+        return_something = return_something,
+        entities_from_previous_runs = entities_from_previous_runs
         )
 
     return this_towns_reviews
