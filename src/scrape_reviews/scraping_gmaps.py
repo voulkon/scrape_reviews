@@ -22,7 +22,6 @@ from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 import logging
 
-from scrape_reviews.categories_of_interest import GoogleMapsCategories
 
 def prettify_log_msg(msg):
         """
@@ -156,18 +155,10 @@ def scroll_down_to_reveal_all_reviews(
     scroll_step:int = 5000,
     sleep_time_between_scrolls:int = 1,
     CLASS_OF_REVIEW_CONTAINER = CLASS_OF_REVIEW_CONTAINER
-    ):
+    ) -> None:
     """
     Scrolling the reviews pane so that all un-loaded reviews get revealed 
     """
-    # from time import sleep
-    # from selenium.webdriver.support.ui import WebDriverWait
-    # from selenium.webdriver.common.by import By
-    # from selenium.webdriver.support import expected_conditions as EC
-    # import logging
-
-    #sleep(1)
-    
     
     procrastinate_until_available(search_by,search_what, driver = driver)
     
@@ -178,7 +169,8 @@ def scroll_down_to_reveal_all_reviews(
     logging.debug( prettify_log_msg(f'no_of_reviews before entering the while: {no_of_reviews_right_now}') )
 
     trials = 0
-    while no_of_reviews_right_now < no_of_reviews and trials < 10 :
+    max_trials = 10
+    while no_of_reviews_right_now < no_of_reviews and trials < (max_trials-1) :
 
         sleep(sleep_time_between_scrolls)
         
@@ -200,10 +192,17 @@ def scroll_down_to_reveal_all_reviews(
             print_trials = str(trials+1)
             logging.info(f'Stuck in scrolling. Trial Number: {print_trials}')
             trials += 1
+            reached_max_trials = trials >= (max_trials-1)
+
+            if reached_max_trials:
+
+                logging.info(f'reached_max_trials')
+                return None #So that we make sure we get out of the infinite while
 
         no_of_reviews_right_now = len(driver.find_elements(By.CLASS_NAME,  CLASS_OF_REVIEW_CONTAINER ))
         
         sleep(sleep_time_between_scrolls)
+
 
 def extract_info_of_each_element(specific_element, INFO_DICTIONARY:dict[str] = INFO_DICTIONARY) -> dict[str]:
     """
@@ -520,7 +519,11 @@ def fetch_gmaps_reviews(
             
             scroll_down_to_reveal_all_reviews(no_of_reviews = no_of_reviews,  driver = driver,  sleep_time_between_scrolls = GENERAL_WAIT_TIME  )
 
+            logging.info("scroll_down_to_reveal_all_reviews just finished")
+            
             expand_collapsed_reviews(driver = driver)
+
+            logging.info("reviews expanded")
 
             reviews_of_this_entity = driver.find_elements(By.CLASS_NAME,  CLASS_OF_REVIEW_CONTAINER )
             
@@ -675,7 +678,7 @@ def fetch_gmaps_reviews(
 
                 sleep(GENERAL_WAIT_TIME)
                 
-                no_of_reviews = int(specific_elements_info['Number_of_Ratings'].replace("(","").replace(")",""))
+                no_of_reviews = int(specific_elements_info['Number_of_Ratings'].replace("(","").replace(")","").replace(".","") )
 
                 logging.info( f'Entering this_entitys_reviews. Expecting to extract {no_of_reviews} reviews'  )
                 

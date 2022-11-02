@@ -1,0 +1,16 @@
+LICENSE
+README.md
+setup.cfg
+setup.py
+src/scrape_reviews/__init__.py
+src/scrape_reviews/categories_of_interest.py
+src/scrape_reviews/cleaning_gmaps.py
+src/scrape_reviews/connect_with_sqlite_db.py
+src/scrape_reviews/gmaps_constants.py
+src/scrape_reviews/saving.py
+src/scrape_reviews/scraping_gmaps.py
+src/scrape_reviews.egg-info/PKG-INFO
+src/scrape_reviews.egg-info/SOURCES.txt
+src/scrape_reviews.egg-info/dependency_links.txt
+src/scrape_reviews.egg-info/requires.txt
+src/scrape_reviews.egg-info/top_level.txt
