@@ -1,3 +1,4 @@
 manually_test*
 notes*
+experiment*.py
 .env
